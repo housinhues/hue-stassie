@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>Housing Hues — Unified Workstation</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#12140f;
+  --bg-raised:#191c14;
+  --line:#2a2e21;
+  --sage:#9caf6f;
+  --olive:#5c6b3a;
+  --cream:#ece7d9;
+  --muted:#8b8f7c;
+  --alert:#c1603f;
+  --alert-bg:#2a1913;
+  --ok:#7fa17a;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    linear-gradient(var(--bg),var(--bg)) ,
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(156,175,111,0.035) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(156,175,111,0.035) 40px);
+  color:var(--cream);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+  padding:0 0 40px 0;
+}
+a{color:var(--sage);}
+
+/* ---- Header ---- */
+header{
+  padding:28px clamp(16px,4vw,48px) 20px;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:16px;
+}
+.wordmark{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.wordmark svg{width:34px;height:34px;flex-shrink:0;}
+.wordmark h1{
+  font-family:'Fraunces',serif;
+  font-weight:500;
+  font-size:26px;
+  margin:0;
+  letter-spacing:0.2px;
+}
+.wordmark h1 span{color:var(--sage);}
+.tagline{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  color:var(--muted);
+  margin-top:2px;
+}
+.header-actions{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.post-now-btn{
+  background:var(--olive);
+  color:var(--cream);
+  border:none;
+  border-radius:40px;
+  padding:8px 20px;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  transition:background .15s;
+  text-decoration:none;
+}
+.post-now-btn:hover{background:var(--sage);color:#12140f;}
+.who{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:13px;
+  color:var(--muted);
+}
+.id-picker{display:flex;gap:7px;}
+.id-btn{
+  position:relative;
+  width:34px;height:34px;
+  border-radius:5px;
+  background:var(--bg-raised);
+  border:1px solid var(--line);
+  color:var(--id-c);
+  font-family:'JetBrains Mono',monospace;
+  font-weight:700;
+  font-size:14px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:transform .12s ease, border-color .12s ease;
+}
+.id-btn:hover{border-color:var(--id-c);transform:translateY(-1px);}
+.id-btn.active{
+  background:var(--id-c);
+  color:#0c0d09;
+  border-color:var(--id-c);
+  box-shadow:0 0 0 1px var(--id-c), 0 0 14px -2px var(--id-c);
+}
+.active-name{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  color:var(--cream);
+}
+
+main{
+  padding:28px clamp(16px,4vw,48px);
+  max-width:1440px;
+  margin:0 auto;
+}
+
+/* ---- Layout grid ---- */
+.dash-grid{
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  gap:24px;
+  margin-top:10px;
+}
+@media(max-width:900px){.dash-grid{grid-template-columns:1fr;}}
+
+/* ---- Cards ---- */
+.glass{
+  background:var(--bg-raised);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:20px;
+  margin-bottom:24px;
+}
+.card-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:14px;
+  font-family:'Fraunces',serif;
+  font-weight:500;
+  font-size:18px;
+}
+.card-header i{color:var(--sage);margin-right:8px;}
+
+/* ---- Project grid inside left col ---- */
+.proj-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:14px;
+}
+.proj-card{
+  background:var(--bg-raised);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.proj-card.urgent{border-color:var(--alert);}
+.proj-name{
+  font-family:'Fraunces',serif;
+  font-size:17px;
+  font-weight:500;
+  background:transparent;
+  border:none;
+  color:var(--cream);
+  padding:0;
+  width:100%;
+}
+.proj-name:focus{outline:none;border-bottom:1px solid var(--sage);}
+.row-label{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-top:4px;}
+.proj-card select,.proj-card input,.proj-card textarea{
+  width:100%;
+  background:var(--bg);
+  border:1px solid var(--line);
+  color:var(--cream);
+  border-radius:6px;
+  padding:6px 8px;
+  font-size:12px;
+  font-family:'Inter',sans-serif;
+}
+.proj-card textarea{min-height:40px;resize:vertical;}
+.social-row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:4px;
+}
+.social-row a{
+  color:var(--muted);
+  font-size:18px;
+  transition:color .15s, transform .15s;
+}
+.social-row a:hover{color:var(--sage);transform:translateY(-2px);}
+.workload-input{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.workload-input input[type="number"]{
+  width:60px;
+  padding:4px 6px;
+}
+.subtask-list{
+  list-style:none;
+  padding:0;
+  margin:4px 0 0;
+}
+.subtask-list li{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  padding:4px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.subtask-list li.done .subtask-text{text-decoration:line-through;color:var(--muted);}
+.subtask-text{
+  flex:1;
+  background:transparent;
+  border:none;
+  color:var(--cream);
+  font-size:13px;
+  padding:2px 0;
+}
+.subtask-text:focus{outline:none;border-bottom:1px solid var(--sage);}
+.add-subtask{
+  display:flex;
+  gap:6px;
+  margin-top:6px;
+}
+.add-subtask input{flex:1;padding:4px 8px;font-size:12px;}
+
+/* ---- Workload section ---- */
+.workload-panel{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+}
+@media(max-width:700px){.workload-panel{grid-template-columns:1fr;}}
+.workload-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+.workload-table th{
+  text-align:left;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color:var(--muted);
+  padding:6px 4px;
+  border-bottom:1px solid var(--line);
+}
+.workload-table td{
+  padding:6px 4px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.wl-bar{
+  height:6px;
+  border-radius:3px;
+  background:var(--line);
+  overflow:hidden;
+  display:inline-block;
+  width:80px;
+}
+.wl-bar span{
+  display:block;
+  height:100%;
+  background:var(--sage);
+  border-radius:3px;
+}
+
+/* ---- Calendar ---- */
+.cal-grid{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:4px;
+  margin-top:10px;
+}
+.cal-day{
+  aspect-ratio:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(255,255,255,0.03);
+  border-radius:6px;
+  font-size:13px;
+  cursor:pointer;
+  transition:background .12s;
+  font-family:'JetBrains Mono',monospace;
+}
+.cal-day:hover{background:rgba(156,175,111,0.2);}
+.cal-day.has-event{color:var(--sage);font-weight:700;}
+.cal-day.other-month{color:var(--muted);opacity:0.4;}
+.cal-day.selected{background:var(--olive);color:#12140f;}
+.event-list{margin-top:12px;}
+.event-item{
+  background:rgba(156,175,111,0.08);
+  border-left:3px solid var(--sage);
+  padding:8px 12px;
+  border-radius:4px;
+  margin-bottom:6px;
+  font-size:13px;
+}
+.event-item .time{color:var(--muted);font-size:11px;}
+.event-item .del-ev{cursor:pointer;float:right;color:var(--muted);}
+.event-item .del-ev:hover{color:var(--alert);}
+.add-event-form{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:10px;
+}
+.add-event-form input,.add-event-form textarea{
+  padding:6px 10px;
+  background:var(--bg);
+  border:1px solid var(--line);
+  color:var(--cream);
+  border-radius:6px;
+  font-size:12px;
+  font-family:'Inter',sans-serif;
+}
+.add-event-form textarea{grid-column:1 / -1;min-height:40px;}
+
+/* ---- Social embeds ---- */
+.embed-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+}
+@media(max-width:700px){.embed-grid{grid-template-columns:1fr;}}
+.embed-box iframe{
+  width:100%;
+  min-height:400px;
+  border:none;
+  border-radius:8px;
+}
+.instagram-toggle{
+  display:flex;
+  gap:12px;
+  margin-bottom:12px;
+}
+.instagram-toggle button{
+  background:transparent;
+  border:1px solid var(--line);
+  color:var(--muted);
+  padding:4px 14px;
+  border-radius:20px;
+  cursor:pointer;
+  font-size:12px;
+}
+.instagram-toggle button.active{
+  border-color:var(--sage);
+  color:var(--cream);
+  background:rgba(156,175,111,0.1);
+}
+.insta-token-area input{width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--line);color:var(--cream);border-radius:6px;font-size:12px;margin-bottom:8px;}
+.insta-feed-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+}
+.insta-feed-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--line);}
+
+/* ---- Buttons ---- */
+.btn{
+  background:var(--olive);
+  color:var(--cream);
+  border:none;
+  border-radius:6px;
+  padding:6px 14px;
+  font-size:12px;
+  font-weight:500;
+  cursor:pointer;
+  transition:background .15s;
+}
+.btn:hover{background:var(--sage);color:#12140f;}
+.btn-sm{font-size:11px;padding:4px 10px;}
+.del-x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;}
+.del-x:hover{color:var(--alert);}
+.empty{color:var(--muted);font-size:13px;padding:20px;text-align:center;font-style:italic;}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar{height:6px;width:6px;}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="wordmark">
+      <svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="19" stroke="#9caf6f" stroke-width="1"/><circle cx="20" cy="10" r="2.4" fill="#9caf6f"/><circle cx="12" cy="26" r="2.4" fill="#9caf6f"/><circle cx="28" cy="26" r="2.4" fill="#9caf6f"/><path d="M20 10 L12 26 L28 26 Z" stroke="#5c6b3a" stroke-width="1.1" fill="none"/><circle cx="20" cy="21" r="1.6" fill="#ece7d9"/></svg>
+      <div><h1>housing<span>hues</span></h1><div class="tagline">Your vision, our architecture</div></div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <a href="https://www.instagram.com/" target="_blank" class="post-now-btn"><i class="fas fa-plus-circle"></i> Post Now</a>
+    <div class="who">
+      <span class="active-name" id="activeName"></span>
+      <div class="id-picker" id="idPicker"></div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- Projects + Sidebar grid -->
+  <div class="dash-grid">
+    <!-- LEFT: Projects -->
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2 style="font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin:0;"><i class="fas fa-layer-group" style="color:var(--sage);"></i> Projects</h2>
+        <button class="btn" id="addProjectBtn">+ New Project</button>
+      </div>
+      <div class="proj-grid" id="projectGrid"></div>
+    </div>
+
+    <!-- RIGHT: Workload + Calendar -->
+    <div>
+      <!-- Workload -->
+      <div class="glass">
+        <div class="card-header"><i class="fas fa-chart-pie"></i> Workload</div>
+        <div class="workload-panel">
+          <div><canvas id="workloadChart" width="200" height="200"></canvas></div>
+          <div><table class="workload-table" id="wlTable"><tbody></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- Calendar -->
+      <div class="glass">
+        <div class="card-header"><i class="fas fa-calendar-alt"></i> Calendar</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <button class="btn btn-sm" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+          <span id="calMonthYear" style="font-family:'Fraunces',serif;font-size:16px;"></span>
+          <button class="btn btn-sm" onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="event-list" id="eventList"></div>
+        <div class="add-event-form">
+          <input id="evTitle" placeholder="Event title (e.g. SuperFly meet)">
+          <input id="evTime" type="datetime-local">
+          <input id="evWith" placeholder="With whom (e.g. Lesego)">
+          <input id="evDate" type="date" style="grid-column:1 / -1;">
+          <textarea id="evMemo" placeholder="Memo / notes..."></textarea>
+          <button class="btn" onclick="addEvent()" style="grid-column:1 / -1;">Add Event</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Social Embeds (Full width) -->
+  <div style="margin-top:28px;">
+    <div class="embed-grid">
+      <!-- Facebook -->
+      <div class="glass">
+        <div class="card-header"><i class="fab fa-facebook"></i> Facebook Feed</div>
+        <input id="fbPageUrl" placeholder="Paste Facebook Page URL (e.g. https://www.facebook.com/HousingHues)" style="width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--line);color:var(--cream);border-radius:6px;font-size:12px;margin-bottom:10px;" onchange="updateFacebookEmbed()">
+        <div class="embed-box" id="fbEmbedContainer"><iframe src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2FHousingHues&tabs=timeline&width=340&height=400&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId" width="100%" height="400" style="border:none;overflow:hidden;" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe></div>
+      </div>
+
+      <!-- Instagram -->
+      <div class="glass">
+        <div class="card-header"><i class="fab fa-instagram"></i> Instagram Feed</div>
+        <div class="instagram-toggle">
+          <button class="active" data-mode="publer" onclick="setInstaMode('publer')">Publer Embed</button>
+          <button data-mode="api" onclick="setInstaMode('api')">Official API</button>
+        </div>
+        <div id="instaPublerArea">
+          <input id="instaPublerCode" placeholder="Paste Publer iframe embed code here..." style="width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--line);color:var(--cream);border-radius:6px;font-size:12px;margin-bottom:10px;" onchange="updateInstaEmbed()">
+          <div class="embed-box" id="instaPublerContainer"><p style="color:var(--muted);font-size:13px;">Paste your Publer embed code above to display your feed.</p></div>
+        </div>
+        <div id="instaApiArea" style="display:none;">
+          <input id="instaToken" placeholder="Instagram Access Token" style="width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--line);color:var(--cream);border-radius:6px;font-size:12px;margin-bottom:8px;" onchange="fetchInstaFeed()">
+          <input id="instaUserId" placeholder="Instagram User ID" style="width:100%;padding:8px 12px;background:var(--bg);border:1px solid var(--line);color:var(--cream);border-radius:6px;font-size:12px;margin-bottom:8px;" onchange="fetchInstaFeed()">
+          <div class="insta-feed-grid" id="instaApiFeed"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ---- DATA ----
+const STORAGE_KEY = 'hh-unified-data';
+const IDENTITIES = [
+  {name:'ntate.mongale', letter:'N', color:'#33e0ff'},
+  {name:'Housing Hues',  letter:'H', color:'#b6ff3c'},
+  {name:'Clean Totty',   letter:'C', color:'#ff2e88'},
+  {name:'DMNT',          letter:'D', color:'#ff9500'},
+  {name:'Vuks',          letter:'V', color:'#a45cff'},
+  {name:'018 Productions', letter:'0', color:'#ff3b3b'}
+];
+
+const DEFAULT_PROJECTS = [
+  {id:'p1',name:'True Organics', status:'blocked', priority:'urgent', nextAction:'Resolve website delay', notes:'Client paid ~R1000 extra', workload:25, subtasks:[{id:'s1',text:'Resolve website delay',done:false},{id:'s2',text:'Send exit threat response',done:false}]},
+  {id:'p2',name:'SuperFly (Sept)', status:'active', priority:'normal', nextAction:'Keep artist roster', notes:'4-day event', workload:30, subtasks:[{id:'s3',text:'Confirm artists',done:true},{id:'s4',text:'Schedule logistics',done:false}]},
+  {id:'p3',name:'Indigo Edit v2', status:'blocked', priority:'urgent', nextAction:'Deliver demo', notes:'Batch editing validation', workload:15, subtasks:[{id:'s5',text:'Render demo',done:false}]},
+  {id:'p4',name:'Kota order system', status:'pending', priority:'normal', nextAction:'Confirm shop name', notes:'Mobile trailer', workload:10, subtasks:[{id:'s6',text:'Design menu',done:true}]},
+  {id:'p5',name:'Olgeit (Marriza)', status:'active', priority:'normal', nextAction:'Content strategy', notes:'50/50 split', workload:8, subtasks:[]},
+  {id:'p6',name:'018 Productions', status:'blocked', priority:'normal', nextAction:'Unblock batch editing', notes:'2+ months stalled', workload:7, subtasks:[]},
+  {id:'p7',name:'D.U.C Tour', status:'active', priority:'normal', nextAction:'Support collabs', notes:'Event planning', workload:3, subtasks:[]},
+  {id:'p8',name:'Vuselela TVET', status:'pending', priority:'normal', nextAction:'Follow up call', notes:'Proposal submitted', workload:2, subtasks:[]}
+];
+
+let data = { projects:[], tasks:[], events:[], instaMode:'publer', activeIdentity:IDENTITIES[0].name };
+let calDate = new Date();
+let workloadChart = null;
+
+// ---- HELPERS ----
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function escHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escAttr(s){ return escHtml(s).replace(/"/g,'&quot;'); }
+
+// ---- STORAGE ----
+async function load(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      data = parsed;
+    } else {
+      data.projects = DEFAULT_PROJECTS.map(p=>({...p, subtasks:p.subtasks.map(s=>({...s}))}));
+      data.events = [];
+      data.instaMode = 'publer';
+      data.activeIdentity = IDENTITIES[0].name;
+    }
+  }catch(e){ console.warn('Storage load fallback', e); }
+  renderAll();
+}
+function save(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){ console.warn('Save failed', e); }
+}
+
+// ---- RENDER ----
+function renderAll(){
+  renderIdentity();
+  renderProjects();
+  renderWorkload();
+  renderCalendar();
+  renderEvents();
+  renderInstagram();
+  renderFacebook();
+}
+
+// ---- IDENTITY ----
+function renderIdentity(){
+  const picker = document.getElementById('idPicker');
+  picker.innerHTML = IDENTITIES.map(id => `
+    <button class="id-btn ${id.name===data.activeIdentity?'active':''}" style="--id-c:${id.color}" onclick="setIdentity('${id.name}')">${id.letter}</button>
+  `).join('');
+  document.getElementById('activeName').textContent = data.activeIdentity;
+}
+function setIdentity(name){
+  data.activeIdentity = name;
+  save();
+  renderIdentity();
+}
+
+// ---- PROJECTS ----
+function renderProjects(){
+  const grid = document.getElementById('projectGrid');
+  if(!data.projects.length){ grid.innerHTML='<div class="empty">No projects. Add one.</div>'; return; }
+  grid.innerHTML = data.projects.map(p => `
+    <div class="proj-card ${p.priority==='urgent'?'urgent':''}">
+      <input class="proj-name" value="${escAttr(p.name)}" onchange="updateProj('${p.id}','name',this.value)">
+      <div>
+        <select onchange="updateProj('${p.id}','status',this.value)">
+          ${['active','blocked','pending'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <select onchange="updateProj('${p.id}','priority',this.value)" style="margin-left:6px;">
+          ${['normal','urgent'].map(s=>`<option value="${s}" ${p.priority===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div><div class="row-label">Next action</div><input value="${escAttr(p.nextAction||'')}" onchange="updateProj('${p.id}','nextAction',this.value)"></div>
+      <div><div class="row-label">Notes</div><textarea onchange="updateProj('${p.id}','notes',this.value)">${escHtml(p.notes||'')}</textarea></div>
+      <div class="workload-input">
+        <span class="row-label">Workload %</span>
+        <input type="number" min="0" max="100" value="${p.workload||0}" onchange="updateProj('${p.id}','workload',Number(this.value))">
+      </div>
+      <div><div class="row-label">Subtasks</div>
+        <ul class="subtask-list" id="subtasks-${p.id}">
+          ${(p.subtasks||[]).map(s => `
+            <li class="${s.done?'done':''}">
+              <input type="checkbox" ${s.done?'checked':''} onchange="toggleSubtask('${p.id}','${s.id}')">
+              <input class="subtask-text" value="${escAttr(s.text)}" onchange="updateSubtaskText('${p.id}','${s.id}',this.value)">
+              <button class="del-x" onclick="deleteSubtask('${p.id}','${s.id}')">✕</button>
+            </li>`).join('')}
+        </ul>
+        <div class="add-subtask">
+          <input id="newSub-${p.id}" placeholder="Add subtask..." onkeydown="if(event.key==='Enter')addSubtask('${p.id}')">
+          <button class="btn btn-sm" onclick="addSubtask('${p.id}')">+</button>
+        </div>
+      </div>
+      <div class="social-row">
+        <a href="#" target="_blank" title="Instagram"><i class="fab fa-instagram"></i></a>
+        <a href="#" target="_blank" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+        <a href="#" target="_blank" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+        <a href="#" target="_blank" title="Email"><i class="fas fa-envelope"></i></a>
+        <a href="#" target="_blank" title="Drive"><i class="fas fa-folder-open"></i></a>
+        <a href="#" target="_blank" title="Website"><i class="fas fa-globe"></i></a>
+        <button class="del-x" onclick="deleteProject('${p.id}')" style="margin-left:auto;">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function updateProj(id, field, value){
+  const p = data.projects.find(p=>p.id===id); if(!p) return;
+  p[field] = value;
+  if(field==='workload'){ p.workload = Math.min(100, Math.max(0, Number(value)||0)); }
+  save(); renderWorkload(); if(field==='name') renderProjects();
+}
+async function deleteProject(id){
+  data.projects = data.projects.filter(p=>p.id!==id);
+  data.tasks = data.tasks.filter(t=>t.projectId!==id);
+  save(); renderAll();
+}
+document.getElementById('addProjectBtn').addEventListener('click', ()=>{
+  data.projects.push({id:uid(),name:'New project',status:'pending',priority:'normal',nextAction:'',notes:'',workload:0,subtasks:[]});
+  save(); renderAll();
+});
+
+// ---- SUBTASKS ----
+function addSubtask(pid){
+  const inp = document.getElementById(`newSub-${pid}`);
+  if(!inp||!inp.value.trim()) return;
+  const p = data.projects.find(p=>p.id===pid); if(!p) return;
+  p.subtasks.push({id:uid(), text:inp.value.trim(), done:false});
+  inp.value='';
+  save(); renderProjects(); renderWorkload();
+}
+function toggleSubtask(pid, sid){
+  const p = data.projects.find(p=>p.id===pid); if(!p) return;
+  const s = p.subtasks.find(s=>s.id===sid); if(!s) return;
+  s.done = !s.done;
+  save(); renderProjects(); renderWorkload();
+}
+function updateSubtaskText(pid, sid, val){
+  const p = data.projects.find(p=>p.id===pid); if(!p) return;
+  const s = p.subtasks.find(s=>s.id===sid); if(!s) return;
+  s.text = val;
+  save(); renderProjects();
+}
+function deleteSubtask(pid, sid){
+  const p = data.projects.find(p=>p.id===pid); if(!p) return;
+  p.subtasks = p.subtasks.filter(s=>s.id!==sid);
+  save(); renderProjects(); renderWorkload();
+}
+
+// ---- WORKLOAD ----
+function renderWorkload(){
+  const projects = data.projects.filter(p => (p.workload||0) > 0);
+  const labels = projects.map(p=>p.name);
+  const values = projects.map(p=>p.workload||0);
+  const total = values.reduce((a,b)=>a+b,0) || 1;
+
+  // Table
+  const tbody = document.querySelector('#wlTable tbody');
+  tbody.innerHTML = projects.map(p => {
+    const done = (p.subtasks||[]).filter(s=>s.done).length;
+    const totalS = (p.subtasks||[]).length;
+    const pct = totalS ? Math.round((done/totalS)*100) : 0;
+    const barW = Math.round((p.workload/total)*100);
+    return `<tr><td>${escHtml(p.name)}</td><td>${p.workload}%</td><td><div class="wl-bar"><span style="width:${barW}%"></span></div></td><td>${pct}% done</td></tr>`;
+  }).join('') || '<tr><td colspan="4" style="color:var(--muted);padding:12px;">No workload data. Set % on projects.</td></tr>';
+
+  // Chart
+  const ctx = document.getElementById('workloadChart').getContext('2d');
+  if(workloadChart) workloadChart.destroy();
+  workloadChart = new Chart(ctx, {
+    type:'pie',
+    data:{ labels, datasets:[{ data:values, backgroundColor:['#9caf6f','#5c6b3a','#7fa17a','#c1603f','#a45cff','#ff9500','#33e0ff','#ff2e88'] }] },
+    options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ color:'#ece7d9', font:{size:10} } } } }
+  });
+}
+
+// ---- CALENDAR ----
+function renderCalendar(){
+  const year = calDate.getFullYear(), month = calDate.getMonth();
+  const first = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const today = new Date().getDate();
+  const todayMonth = new Date().getMonth();
+  const todayYear = new Date().getFullYear();
+
+  document.getElementById('calMonthYear').textContent = new Date(year, month).toLocaleString('default', { month:'long', year:'numeric' });
+
+  const grid = document.getElementById('calGrid');
+  let html = '';
+  for(let i=0; i<first; i++) html += `<div class="cal-day other-month"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const has = data.events.some(e=>e.date===dateStr);
+    const isToday = (d===today && month===todayMonth && year===todayYear);
+    html += `<div class="cal-day ${has?'has-event':''} ${isToday?'selected':''}" onclick="selectDate('${dateStr}')">${d}</div>`;
+  }
+  grid.innerHTML = html;
+  renderEvents();
+}
+
+function changeMonth(delta){
+  calDate.setMonth(calDate.getMonth()+delta);
+  renderCalendar();
+}
+
+function selectDate(dateStr){
+  document.getElementById('evDate').value = dateStr;
+  renderEvents();
+}
+
+function renderEvents(){
+  const dateStr = document.getElementById('evDate').value || new Date().toISOString().split('T')[0];
+  const list = document.getElementById('eventList');
+  const filtered = data.events.filter(e=>e.date===dateStr);
+  if(!filtered.length){ list.innerHTML = '<div class="empty">No events for this date.</div>'; return; }
+  list.innerHTML = filtered.map(e => `
+    <div class="event-item">
+      <strong>${escHtml(e.title)}</strong>
+      <span class="time">${e.time||''} · with ${e.with||'—'}</span>
+      <button class="del-ev" onclick="deleteEvent('${e.id}')">✕</button>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">${escHtml(e.memo||'')}</div>
+    </div>
+  `).join('');
+}
+
+function addEvent(){
+  const title = document.getElementById('evTitle').value.trim();
+  const time = document.getElementById('evTime').value;
+  const withWhom = document.getElementById('evWith').value.trim();
+  const date = document.getElementById('evDate').value;
+  const memo = document.getElementById('evMemo').value.trim();
+  if(!title || !date){ alert('Title and date required.'); return; }
+  data.events.push({id:uid(), title, time, with:withWhom, date, memo});
+  save();
+  document.getElementById('evTitle').value='';
+  document.getElementById('evTime').value='';
+  document.getElementById('evWith').value='';
+  document.getElementById('evMemo').value='';
+  renderCalendar();
+}
+
+function deleteEvent(id){
+  data.events = data.events.filter(e=>e.id!==id);
+  save();
+  renderCalendar();
+}
+
+// ---- FACEBOOK ----
+function updateFacebookEmbed(){
+  const url = document.getElementById('fbPageUrl').value.trim();
+  if(!url) return;
+  const container = document.getElementById('fbEmbedContainer');
+  const encoded = encodeURIComponent(url);
+  container.innerHTML = `<iframe src="https://www.facebook.com/plugins/page.php?href=${encoded}&tabs=timeline&width=340&height=400&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true&appId" width="100%" height="400" style="border:none;overflow:hidden;" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>`;
+}
+
+// ---- INSTAGRAM ----
+function setInstaMode(mode){
+  data.instaMode = mode;
+  save();
+  document.querySelectorAll('.instagram-toggle button').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.instagram-toggle button[data-mode="${mode}"]`).classList.add('active');
+  document.getElementById('instaPublerArea').style.display = mode==='publer'?'block':'none';
+  document.getElementById('instaApiArea').style.display = mode==='api'?'block':'none';
+}
+
+function updateInstaEmbed(){
+  const code = document.getElementById('instaPublerCode').value.trim();
+  const container = document.getElementById('instaPublerContainer');
+  if(!code){ container.innerHTML = '<p style="color:var(--muted);font-size:13px;">Paste your Publer embed code above.</p>'; return; }
+  container.innerHTML = code;
+}
+
+async function fetchInstaFeed(){
+  const token = document.getElementById('instaToken').value.trim();
+  const userId = document.getElementById('instaUserId').value.trim();
+  if(!token || !userId){ document.getElementById('instaApiFeed').innerHTML = '<p style="color:var(--muted);font-size:13px;">Enter both Access Token and User ID.</p>'; return; }
+  try{
+    const res = await fetch(`https://graph.instagram.com/${userId}/media?fields=id,media_url,permalink&access_token=${token}`);
+    const json = await res.json();
+    const feed = document.getElementById('instaApiFeed');
+    if(json.data && json.data.length){
+      feed.innerHTML = json.data.slice(0,9).map(img => `<a href="${img.permalink}" target="_blank"><img src="${img.media_url}" alt="post"></a>`).join('');
+    } else { feed.innerHTML = '<p style="color:var(--muted);font-size:13px;">No posts found or invalid token.</p>'; }
+  }catch(e){ document.getElementById('instaApiFeed').innerHTML = '<p style="color:var(--alert);font-size:13px;">Error fetching feed. Check token/ID.</p>'; }
+}
+
+function renderInstagram(){
+  setInstaMode(data.instaMode || 'publer');
+}
+
+// ---- INIT ----
+load();
+</script>
+</body>
+</html>
