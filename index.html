@@ -89,6 +89,9 @@ main{padding:28px clamp(16px,4vw,48px);max-width:1440px;margin:0 auto;}
 .embed-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 @media(max-width:700px){.embed-grid{grid-template-columns:1fr;}}
 .embed-box iframe{width:100%;min-height:400px;border:none;border-radius:8px;}
+.instagram-toggle{display:flex;gap:12px;margin-bottom:12px;}
+.instagram-toggle button{background:transparent;border:1px solid var(--line);color:var(--muted);padding:4px 14px;border-radius:20px;cursor:pointer;font-size:12px;}
+.instagram-toggle button.active{border-color:var(--sage);color:var(--cream);background:rgba(156,175,111,0.1);}
 .btn{background:var(--olive);color:var(--cream);border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:500;cursor:pointer;transition:background .15s;}
 .btn:hover{background:var(--sage);color:#12140f;}
 .btn-sm{font-size:11px;padding:4px 10px;}
@@ -166,6 +169,11 @@ main{padding:28px clamp(16px,4vw,48px);max-width:1440px;margin:0 auto;}
       </div>
     </div>
   </div>
+  <div class="glass" id="talentSection" style="margin-top:28px;display:none;">
+    <div class="card-header"><i class="fas fa-user-tie"></i> Talent</div>
+    <div class="instagram-toggle" id="talentCategoryTabs"></div>
+    <div class="proj-grid" id="talentGrid"></div>
+  </div>
 </main>
 <script>
 const STORAGE_KEY = 'hh-unified-data';
@@ -175,7 +183,7 @@ const IDENTITIES = [
   {name:'Clean Totty',   letter:'C', color:'#ff2e88', greeting:'Ayy, Fresh', emoji:'🧼', role:'Keeping it clean (placeholder — send your line)', instagram:'https://www.instagram.com/cleantotty', facebook:''},
   {name:'DMNT',          letter:'D', color:'#ff9500', greeting:'Tapped in sir?', emoji:'🌐', role:'Internet cafe', instagram:'https://www.instagram.com/don_mention_it', facebook:''},
   {name:'Vuks',          letter:'V', color:'#a45cff', greeting:'GREETINGS', emoji:'🎓', role:"I'm academically tapped in", instagram:'https://www.instagram.com/vuselelatvetcollege', facebook:''},
-  {name:'Music Xhefs',   letter:'M', color:'#00ff88', greeting:'Waddup Chef', emoji:'🎧', role:'Music production (placeholder — send socials)', instagram:'', facebook:''},
+  {name:'Music Xhefs',   letter:'M', color:'#00ff88', greeting:'Waddup Chef', emoji:'🎧', role:'Music production (placeholder — send socials)', instagram:'https://www.instagram.com/music.xhefs', facebook:''},
   {name:'018 Productions', letter:'0', color:'#ff3b3b', greeting:'Fede Whuzet', emoji:'🎬', role:"I'm a creative director here", instagram:'https://www.instagram.com/018productions', facebook:''}
 ];
 const VIBE_LEVELS = [
@@ -208,7 +216,16 @@ const DEFAULT_PROJECTS = [
   {id:'p7',name:'D.U.C Tour', identity:'Housing Hues', status:'active', priority:'normal', nextAction:'Support collabs', notes:'Event planning', workload:3, subtasks:[]},
   {id:'p8',name:'Vuselela TVET', identity:'Vuks', status:'pending', priority:'normal', nextAction:'Follow up call', notes:'Proposal submitted', workload:2, subtasks:[]}
 ];
-let data = { projects:[], tasks:[], events:[], instaMode:'publer', activeIdentity:IDENTITIES[0].name };
+const DEFAULT_TALENT = {
+  activeCategory: 'models',
+  categories: {
+    models: [
+      {id:'tm1', name:'Amogelang Mogale', instagram:'https://www.instagram.com/_amogelangmogale', note:''},
+      {id:'tm2', name:'Davis (Nhlanhla Nkacha)', instagram:'https://www.instagram.com/nhlanhla_nkacha', note:'Editorial | Fittings | Runway | Commercial'}
+    ]
+  }
+};
+let data = { projects:[], tasks:[], events:[], instaMode:'publer', activeIdentity:IDENTITIES[0].name, talent:null };
 let calDate = new Date();
 let workloadChart = null;
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -224,11 +241,12 @@ async function load(){
       data.instaMode = 'publer';
       data.activeIdentity = IDENTITIES[0].name;
     }
+    if(!data.talent){ data.talent = JSON.parse(JSON.stringify(DEFAULT_TALENT)); }
   }catch(e){ console.warn('Storage load fallback', e); }
   renderAll();
 }
 function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){ console.warn('Save failed', e); } }
-function renderAll(){ renderIdentity(); renderProjects(); renderWorkload(); renderCalendar(); renderEvents(); renderInstagram(); renderFacebook(); }
+function renderAll(){ renderIdentity(); renderProjects(); renderWorkload(); renderCalendar(); renderEvents(); renderInstagram(); renderFacebook(); renderTalent(); }
 function renderIdentity(){
   const picker = document.getElementById('idPicker');
   picker.innerHTML = IDENTITIES.map(id => `
@@ -482,6 +500,35 @@ function renderInstagram(){
       </div>
       <a href="${escAttr(id.instagram)}" target="_blank" class="btn btn-sm"><i class="fab fa-instagram"></i> Open</a>
     </div>`;
+}
+function renderTalent(){
+  const section = document.getElementById('talentSection');
+  if(!section) return;
+  if(data.activeIdentity !== 'Housing Hues'){ section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  if(!data.talent){ data.talent = JSON.parse(JSON.stringify(DEFAULT_TALENT)); }
+  const cats = Object.keys(data.talent.categories);
+  const tabsEl = document.getElementById('talentCategoryTabs');
+  tabsEl.innerHTML = cats.map(c => `<button class="${c===data.talent.activeCategory?'active':''}" onclick="setTalentCategory('${c}')">${c.charAt(0).toUpperCase()+c.slice(1)}</button>`).join('');
+  const grid = document.getElementById('talentGrid');
+  const list = data.talent.categories[data.talent.activeCategory] || [];
+  if(!list.length){ grid.innerHTML = '<div class="empty">No entries yet.</div>'; return; }
+  grid.innerHTML = list.map(t => `
+    <div class="proj-card">
+      <div class="insta-profile-card" style="--id-c:#b6ff3c;padding:14px;">
+        <div class="insta-avatar">${escHtml(t.name.charAt(0))}</div>
+        <div class="insta-info">
+          <div class="insta-handle">${escHtml(t.name)}</div>
+          <div class="insta-name">${escHtml(t.note||'')}</div>
+        </div>
+        ${t.instagram ? `<a href="${escAttr(t.instagram)}" target="_blank" class="btn btn-sm"><i class="fab fa-instagram"></i></a>` : ''}
+      </div>
+    </div>`).join('');
+}
+function setTalentCategory(cat){
+  data.talent.activeCategory = cat;
+  save();
+  renderTalent();
 }
 load();
 </script>
