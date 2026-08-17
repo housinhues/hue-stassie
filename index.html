@@ -19,7 +19,7 @@ header{padding:28px clamp(16px,4vw,48px) 20px;border-bottom:1px solid var(--line
 .wordmark h1{font-family:'Fraunces',serif;font-weight:500;font-size:26px;margin:0;letter-spacing:0.2px;}
 .wordmark h1 span{color:var(--sage);}
 .tagline{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:2px;}
-.header-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.header-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}.cloud-sync{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}.cloud-status{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);padding:5px 9px;border:1px solid var(--line);border-radius:20px;}.cloud-status.online{color:var(--ok);border-color:var(--ok);}.cloud-status.pending{color:#fad165;border-color:#fad165;}.cloud-status.offline{color:var(--muted);}.cloud-btn{background:transparent;color:var(--sage);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;}.cloud-btn:hover{border-color:var(--sage);background:rgba(156,175,111,0.1);}.cloud-btn:disabled{opacity:.45;cursor:not-allowed;}.cloud-help{max-width:360px;color:var(--muted);font-size:12px;line-height:1.5;padding:12px 14px;background:var(--bg-raised);border:1px solid var(--line);border-radius:8px;position:absolute;right:0;top:42px;z-index:20;box-shadow:0 12px 30px rgba(0,0,0,.25);}.cloud-wrap{position:relative;}
 .post-now-btn{background:var(--olive);color:var(--cream);border:none;border-radius:40px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;text-decoration:none;}
 .post-now-btn:hover{background:var(--sage);color:#12140f;}
 .who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
@@ -111,6 +111,15 @@ main{padding:28px clamp(16px,4vw,48px);max-width:1440px;margin:0 auto;}
     </div>
   </div>
   <div class="header-actions">
+    <div class="cloud-wrap">
+      <div class="cloud-sync">
+        <span class="cloud-status offline" id="cloudStatus">LOCAL ONLY</span>
+        <button class="cloud-btn" id="cloudConnectBtn" type="button" onclick="connectCloud()"><i class="fas fa-cloud"></i> Connect cloud</button>
+        <button class="cloud-btn" id="cloudSyncBtn" type="button" onclick="syncToCloud()" disabled><i class="fas fa-arrows-rotate"></i> Sync</button>
+        <button class="cloud-btn" id="cloudHelpBtn" type="button" onclick="toggleCloudHelp()" aria-label="Cloud sync help"><i class="fas fa-circle-question"></i></button>
+      </div>
+      <div class="cloud-help" id="cloudHelp" hidden>Hue Stasie remains usable offline. Connect Supabase to share projects and events across devices. Your local data is kept as a cache until you choose Sync.</div>
+    </div>
     <a href="https://www.instagram.com/" target="_blank" class="post-now-btn"><i class="fas fa-plus-circle"></i> Post Now</a>
     <div class="who">
       <span class="active-name" id="activeName"></span>
@@ -175,6 +184,9 @@ main{padding:28px clamp(16px,4vw,48px);max-width:1440px;margin:0 auto;}
     <div class="proj-grid" id="talentGrid"></div>
   </div>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-sync.js"></script>
 <script>
 const STORAGE_KEY = 'hh-unified-data';
 const IDENTITIES = [
@@ -226,6 +238,7 @@ const DEFAULT_TALENT = {
   }
 };
 let data = { projects:[], tasks:[], events:[], instaMode:'publer', activeIdentity:IDENTITIES[0].name, talent:null };
+window.HueStasieData = () => data;
 let calDate = new Date();
 let workloadChart = null;
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -242,10 +255,26 @@ async function load(){
       data.activeIdentity = IDENTITIES[0].name;
     }
     if(!data.talent){ data.talent = JSON.parse(JSON.stringify(DEFAULT_TALENT)); }
-  }catch(e){ console.warn('Storage load fallback', e); }
+    await window.HueStasieCloud?.init();
+    const remote = await window.HueStasieCloud?.hydrate();
+    if(remote){
+      data = {...data, ...remote};
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+  }catch(e){ console.warn('Storage/cloud load fallback', e); }
   renderAll();
 }
-function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){ console.warn('Save failed', e); } }
+function save(){
+  try{
+    data.updatedAt = new Date().toISOString();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const status = document.getElementById('cloudStatus');
+    if(status && window.HueStasieCloud?.isSignedIn()){
+      status.textContent = 'LOCAL CHANGES';
+      status.className = 'cloud-status pending';
+    }
+  }catch(e){ console.warn('Save failed', e); }
+}
 function renderAll(){ renderIdentity(); renderProjects(); renderWorkload(); renderCalendar(); renderEvents(); renderInstagram(); renderFacebook(); renderTalent(); }
 function renderIdentity(){
   const picker = document.getElementById('idPicker');
