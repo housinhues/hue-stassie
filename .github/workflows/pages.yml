@@ -1,4 +1,4 @@
-name: Deploy Hue Stasie to GitHub Pages
+name: Deploy Hue Stassie to GitHub Pages
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: '.'
 
       - name: Deploy to GitHub Pages
         id: deployment
