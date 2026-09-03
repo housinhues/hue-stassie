@@ -22,6 +22,7 @@ header{padding:28px clamp(16px,4vw,48px) 20px;border-bottom:1px solid var(--line
 .header-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .post-now-btn{background:var(--olive);color:var(--cream);border:none;border-radius:40px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;text-decoration:none;}
 .post-now-btn:hover{background:var(--sage);color:#12140f;}
+.post-now-btn:focus-visible,.btn:focus-visible,.id-btn:focus-visible,.modal-close:focus-visible{outline:2px solid var(--sage);outline-offset:3px;}
 .who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
 .id-picker{display:flex;gap:7px;}
 .id-btn{position:relative;width:34px;height:34px;border-radius:5px;background:var(--bg-raised);border:1px solid var(--line);color:var(--id-c);font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s ease, border-color .12s ease;}
@@ -98,6 +99,27 @@ main{padding:28px clamp(16px,4vw,48px);max-width:1440px;margin:0 auto;}
 .del-x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;}
 .del-x:hover{color:var(--alert);}
 .empty{color:var(--muted);font-size:13px;padding:20px;text-align:center;font-style:italic;}
+.post-queue{display:grid;gap:10px;}
+.post-item{border:1px solid var(--line);border-radius:8px;padding:12px;background:rgba(156,175,111,0.05);}
+.post-item-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
+.post-item-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:5px;}
+.post-status{font-family:'JetBrains Mono',monospace;font-size:10px;border:1px solid var(--sage);color:var(--sage);border-radius:20px;padding:3px 8px;white-space:nowrap;}
+.post-caption{white-space:pre-wrap;color:var(--cream);font-size:13px;line-height:1.5;margin:10px 0;}
+.post-actions{display:flex;gap:7px;flex-wrap:wrap;}
+.modal-backdrop{position:fixed;inset:0;background:rgba(5,7,4,.78);display:none;align-items:center;justify-content:center;padding:20px;z-index:20;}
+.modal-backdrop.open{display:flex;}
+.post-modal{width:min(620px,100%);max-height:90vh;overflow:auto;background:var(--bg-raised);border:1px solid var(--sage);border-radius:12px;padding:22px;box-shadow:0 16px 60px rgba(0,0,0,.45);}
+.post-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;}
+.post-modal h2{font-family:'Fraunces',serif;font-weight:500;margin:0;font-size:24px;}
+.modal-close{background:none;border:1px solid var(--line);color:var(--cream);border-radius:6px;padding:5px 10px;cursor:pointer;}
+.post-form{display:grid;gap:12px;}
+.post-form label{display:grid;gap:6px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.7px;}
+.post-form input,.post-form select,.post-form textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);border-radius:6px;padding:9px;font:13px 'Inter',sans-serif;}
+.post-form textarea{min-height:150px;resize:vertical;}
+.post-form input:focus,.post-form select:focus,.post-form textarea:focus{outline:2px solid var(--sage);outline-offset:1px;}
+.post-form-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
+.post-note{font-size:12px;color:var(--muted);line-height:1.5;margin:0;}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;}}
 ::-webkit-scrollbar{height:6px;width:6px;}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
 </style>
@@ -111,7 +133,7 @@ main{padding:28px clamp(16px,4vw,48px);max-width:1440px;margin:0 auto;}
     </div>
   </div>
   <div class="header-actions">
-    <a href="https://www.instagram.com/" target="_blank" class="post-now-btn"><i class="fas fa-plus-circle"></i> Post Now</a>
+    <button type="button" class="post-now-btn" onclick="openPostComposer()" aria-haspopup="dialog"><i class="fas fa-plus-circle"></i> Post Now</button>
     <div class="who">
       <span class="active-name" id="activeName"></span>
       <div class="id-picker" id="idPicker"></div>
@@ -169,12 +191,31 @@ main{padding:28px clamp(16px,4vw,48px);max-width:1440px;margin:0 auto;}
       </div>
     </div>
   </div>
+  <section class="glass" id="postQueueSection" style="margin-top:28px;">
+    <div class="card-header"><span><i class="fas fa-paper-plane"></i> Content Queue</span><button class="btn btn-sm" type="button" onclick="openPostComposer()">+ New draft</button></div>
+    <p class="post-note" style="margin-bottom:12px;">Drafts stay inside Hue$tassie until a reviewer approves them. Instagram publishing is not connected yet.</p>
+    <div class="post-queue" id="postQueue"></div>
+  </section>
   <div class="glass" id="talentSection" style="margin-top:28px;display:none;">
     <div class="card-header"><i class="fas fa-user-tie"></i> Talent</div>
     <div class="instagram-toggle" id="talentCategoryTabs"></div>
     <div class="proj-grid" id="talentGrid"></div>
   </div>
 </main>
+<div class="modal-backdrop" id="postModal" role="presentation" onclick="if(event.target===this)closePostComposer()">
+  <section class="post-modal" role="dialog" aria-modal="true" aria-labelledby="postModalTitle">
+    <div class="post-modal-head"><h2 id="postModalTitle">Create social draft</h2><button class="modal-close" type="button" onclick="closePostComposer()" aria-label="Close post composer">Close</button></div>
+    <form class="post-form" onsubmit="return false;">
+      <label>Account<select id="postIdentity"></select></label>
+      <label>Platform<select id="postPlatform"><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></label>
+      <label>Media URL <input id="postMediaUrl" type="url" placeholder="Optional link to an approved Drive asset"></label>
+      <label>Caption<textarea id="postCaption" placeholder="Write the caption or paste a draft..." required></textarea></label>
+      <label>Planned date/time <input id="postPlannedAt" type="datetime-local"></label>
+      <p class="post-note">This release creates a browser draft and approval state only. No post is sent to Instagram or another platform.</p>
+      <div class="post-form-actions"><button class="btn" type="button" onclick="closePostComposer()">Cancel</button><button class="btn" type="button" onclick="savePostDraft('draft')">Save draft</button><button class="btn" type="button" onclick="savePostDraft('in_review')">Send for review</button></div>
+    </form>
+  </section>
+</div>
 <script>
 const STORAGE_KEY = 'hh-unified-data';
 const IDENTITIES = [
@@ -225,9 +266,10 @@ const DEFAULT_TALENT = {
     ]
   }
 };
-let data = { projects:[], tasks:[], events:[], instaMode:'publer', activeIdentity:IDENTITIES[0].name, talent:null };
+let data = { projects:[], tasks:[], events:[], contentItems:[], instaMode:'publer', activeIdentity:IDENTITIES[0].name, talent:null };
 let calDate = new Date();
 let workloadChart = null;
+let editingPostId = null;
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function escHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function escAttr(s){ return escHtml(s).replace(/"/g,'&quot;'); }
@@ -242,11 +284,12 @@ async function load(){
       data.activeIdentity = IDENTITIES[0].name;
     }
     if(!data.talent){ data.talent = JSON.parse(JSON.stringify(DEFAULT_TALENT)); }
+    if(!Array.isArray(data.contentItems)){ data.contentItems = []; }
   }catch(e){ console.warn('Storage load fallback', e); }
   renderAll();
 }
 function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){ console.warn('Save failed', e); } }
-function renderAll(){ renderIdentity(); renderProjects(); renderWorkload(); renderCalendar(); renderEvents(); renderInstagram(); renderFacebook(); renderTalent(); }
+function renderAll(){ renderIdentity(); renderProjects(); renderWorkload(); renderCalendar(); renderEvents(); renderInstagram(); renderFacebook(); renderTalent(); renderPostQueue(); }
 function renderIdentity(){
   const picker = document.getElementById('idPicker');
   picker.innerHTML = IDENTITIES.map(id => `
@@ -501,6 +544,58 @@ function renderInstagram(){
       <a href="${escAttr(id.instagram)}" target="_blank" class="btn btn-sm"><i class="fab fa-instagram"></i> Open</a>
     </div>`;
 }
+function postStatusLabel(status){
+  return ({draft:'Draft',in_review:'In review',changes_requested:'Changes requested',approved:'Approved — ready for handoff'})[status] || status;
+}
+function openPostComposer(id){
+  const item = id ? (data.contentItems||[]).find(p=>p.id===id) : null;
+  editingPostId = item ? item.id : null;
+  document.getElementById('postModalTitle').textContent = item ? 'Edit social draft' : 'Create social draft';
+  document.getElementById('postIdentity').innerHTML = IDENTITIES.map(i=>`<option value="${escAttr(i.name)}" ${((item&&item.identity)||data.activeIdentity)===i.name?'selected':''}>${escHtml(i.name)}</option>`).join('');
+  document.getElementById('postPlatform').value = (item&&item.platform) || 'instagram';
+  document.getElementById('postMediaUrl').value = (item&&item.mediaUrl) || '';
+  document.getElementById('postCaption').value = (item&&item.caption) || '';
+  document.getElementById('postPlannedAt').value = (item&&item.plannedAt) || '';
+  const modal = document.getElementById('postModal');
+  modal.classList.add('open');
+  setTimeout(()=>document.getElementById('postCaption').focus(),0);
+}
+function closePostComposer(){
+  document.getElementById('postModal').classList.remove('open');
+  editingPostId = null;
+}
+function savePostDraft(status){
+  const caption = document.getElementById('postCaption').value.trim();
+  if(!caption){ alert('Caption is required before saving a draft.'); document.getElementById('postCaption').focus(); return; }
+  const now = new Date().toISOString();
+  const payload = {identity:document.getElementById('postIdentity').value, platform:document.getElementById('postPlatform').value, mediaUrl:document.getElementById('postMediaUrl').value.trim(), caption, plannedAt:document.getElementById('postPlannedAt').value, status, updatedAt:now};
+  if(!Array.isArray(data.contentItems)) data.contentItems=[];
+  if(editingPostId){
+    const item = data.contentItems.find(p=>p.id===editingPostId);
+    if(item) Object.assign(item,payload);
+  }else{
+    data.contentItems.unshift({id:uid(),createdAt:now,...payload});
+  }
+  save(); renderPostQueue(); closePostComposer();
+}
+function updatePostStatus(id,status){
+  const item = (data.contentItems||[]).find(p=>p.id===id); if(!item) return;
+  item.status=status; item.updatedAt=new Date().toISOString(); save(); renderPostQueue();
+}
+function deletePostDraft(id){
+  data.contentItems=(data.contentItems||[]).filter(p=>p.id!==id); save(); renderPostQueue();
+}
+function renderPostQueue(){
+  const queue=document.getElementById('postQueue'); if(!queue) return;
+  const items=(data.contentItems||[]).filter(p=>p.identity===data.activeIdentity);
+  if(!items.length){ queue.innerHTML='<div class="empty">No drafts for this identity yet. Use Post Now to create one.</div>'; return; }
+  queue.innerHTML=items.map(p=>`<article class="post-item">
+    <div class="post-item-head"><div><strong>${escHtml(p.platform.charAt(0).toUpperCase()+p.platform.slice(1))}</strong><div class="post-item-meta">${p.plannedAt ? 'Planned '+escHtml(new Date(p.plannedAt).toLocaleString()) : 'No date set'}${p.mediaUrl ? ' · Media attached' : ''}</div></div><span class="post-status">${escHtml(postStatusLabel(p.status))}</span></div>
+    <div class="post-caption">${escHtml(p.caption)}</div>
+    <div class="post-actions"><button class="btn btn-sm" type="button" onclick="openPostComposer('${p.id}')">Edit</button>${p.status==='draft'||p.status==='changes_requested'?`<button class="btn btn-sm" type="button" onclick="updatePostStatus('${p.id}','in_review')">Send for review</button>`:''}${p.status==='in_review'?`<button class="btn btn-sm" type="button" onclick="updatePostStatus('${p.id}','approved')">Approve</button><button class="btn btn-sm" type="button" onclick="updatePostStatus('${p.id}','changes_requested')">Request changes</button>`:''}${p.status==='approved'?'<span class="post-note">Publishing integration pending.</span>':''}<button class="del-x" type="button" onclick="deletePostDraft('${p.id}')" aria-label="Delete draft">✕</button></div>
+  </article>`).join('');
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && document.getElementById('postModal').classList.contains('open')) closePostComposer(); });
 function renderTalent(){
   const section = document.getElementById('talentSection');
   if(!section) return;
