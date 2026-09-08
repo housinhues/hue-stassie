@@ -1,11 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import {
+  isCloudConfigured, getSession, onAuthChange, signInWithEmail, signOut,
+  fetchProjects, upsertProject, fetchContent, upsertContentItem,
+  type CloudProject, type CloudContentItem,
+} from './cloudSync';
+import type { Session } from '@supabase/supabase-js';
 
 type Status = 'active' | 'blocked' | 'planned' | 'done';
 type Module = 'overview' | 'projects' | 'calendar' | 'content' | 'agent';
-type Project = { id: string; name: string; owner: string; status: Status; priority: 'urgent' | 'normal'; next: string; load: number };
-type ContentItem = { id: string; title: string; channel: string; state: 'Draft' | 'In review' | 'Approved'; caption: string; planned: string };
+type Project = { id: string; name: string; owner: string; status: Status; priority: 'urgent' | 'normal'; next: string; notes: string; load: number };
+type ContentItem = { id: string; title: string; channel: string; state: 'Draft' | 'In review' | 'Approved'; caption: string; planned: string; identity: string };
 
 const identities = [
   { name: 'Housing Hues', mark: 'H', color: '#c5ed63' },
@@ -14,15 +20,21 @@ const identities = [
   { name: 'Vuks', mark: 'V', color: '#b695ff' },
 ];
 const seedProjects: Project[] = [
-  { id: 'p1', name: 'True Organics', owner: 'Housing Hues', status: 'blocked', priority: 'urgent', next: 'Resolve website delay', load: 25 },
-  { id: 'p2', name: 'SuperFly · September', owner: 'Housing Hues', status: 'active', priority: 'normal', next: 'Keep artist roster moving', load: 30 },
-  { id: 'p3', name: 'Indigo Edit v2', owner: 'Housing Hues', status: 'blocked', priority: 'urgent', next: 'Deliver demo', load: 15 },
-  { id: 'p4', name: 'D.U.C Tour', owner: 'Housing Hues', status: 'planned', priority: 'normal', next: 'Support collaborations', load: 8 },
+  { id: 'p1', name: 'True Organics', owner: 'Housing Hues', status: 'blocked', priority: 'urgent', next: 'Resolve website delay', notes: '', load: 25 },
+  { id: 'p2', name: 'SuperFly · September', owner: 'Housing Hues', status: 'active', priority: 'normal', next: 'Keep artist roster moving', notes: '', load: 30 },
+  { id: 'p3', name: 'Indigo Edit v2', owner: 'Housing Hues', status: 'blocked', priority: 'urgent', next: 'Deliver demo', notes: '', load: 15 },
+  { id: 'p4', name: 'D.U.C Tour', owner: 'Housing Hues', status: 'planned', priority: 'normal', next: 'Support collaborations', notes: '', load: 8 },
 ];
 const seedContent: ContentItem[] = [
-  { id: 'c1', title: 'September roster announcement', channel: 'Instagram', state: 'In review', caption: 'The next chapter is taking shape. Meet the September roster.', planned: '05 Sep · 10:00' },
-  { id: 'c2', title: 'Housing Hues studio note', channel: 'Instagram', state: 'Draft', caption: 'A quiet look inside the work behind the scenes.', planned: '08 Sep · 14:30' },
+  { id: 'c1', title: 'September roster announcement', channel: 'Instagram', state: 'In review', caption: 'The next chapter is taking shape. Meet the September roster.', planned: '05 Sep · 10:00', identity: 'Housing Hues' },
+  { id: 'c2', title: 'Housing Hues studio note', channel: 'Instagram', state: 'Draft', caption: 'A quiet look inside the work behind the scenes.', planned: '08 Sep · 14:30', identity: 'Housing Hues' },
 ];
+
+// --- Local <-> Cloud shape mapping ---
+const toCloudProject = (p: Project): CloudProject => ({ id: p.id, name: p.name, identity: p.owner, status: p.status, priority: p.priority, next_action: p.next, notes: p.notes, workload: p.load });
+const fromCloudProject = (c: CloudProject): Project => ({ id: c.id, name: c.name, owner: c.identity, status: c.status as Status, priority: c.priority as 'urgent' | 'normal', next: c.next_action, notes: c.notes ?? '', load: c.workload });
+const toCloudContent = (c: ContentItem): CloudContentItem => ({ id: c.id, title: c.title, channel: c.channel, state: c.state, caption: c.caption, planned: c.planned, identity: c.identity });
+const fromCloudContent = (c: CloudContentItem): ContentItem => ({ id: c.id, title: c.title, channel: c.channel, state: c.state as ContentItem['state'], caption: c.caption ?? '', planned: c.planned ?? '', identity: c.identity ?? 'Housing Hues' });
 
 const read = <T,>(key: string, fallback: T): T => { try { return JSON.parse(localStorage.getItem(key) || '') as T; } catch { return fallback; } };
 const save = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
@@ -36,22 +48,96 @@ function App() {
   const [agentOpen, setAgentOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [toast, setToast] = useState('');
+  const [session, setSession] = useState<Session | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<'unavailable' | 'signed-out' | 'syncing' | 'synced' | 'error'>('unavailable');
 
   useEffect(() => { save('huestasie-projects', projects); }, [projects]);
   useEffect(() => { save('huestasie-content', content); }, [content]);
   useEffect(() => { save('huestasie-theme', theme); document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(''), 2600); return () => window.clearTimeout(timer); }, [toast]);
 
+  // Cloud bootstrap: watch auth state, and on sign-in pull remote data (or push
+  // local data up once if the cloud tables are still empty), then treat
+  // Supabase as the source of truth for subsequent edits.
+  useEffect(() => {
+    if (!isCloudConfigured()) { setCloudStatus('unavailable'); return; }
+    let cancelled = false;
+    (async () => {
+      const current = await getSession();
+      if (!cancelled) setSession(current);
+      setCloudStatus(current ? 'syncing' : 'signed-out');
+      if (current) await syncFromCloud();
+    })();
+    const unsubscribe = onAuthChange((next) => {
+      setSession(next);
+      if (next) { setCloudStatus('syncing'); syncFromCloud(); }
+      else setCloudStatus('signed-out');
+    });
+    return () => { cancelled = true; unsubscribe(); };
+  }, []);
+
+  async function syncFromCloud() {
+    try {
+      const [remoteProjects, remoteContent] = await Promise.all([fetchProjects(), fetchContent()]);
+      if (remoteProjects.length === 0 && projects.length > 0) {
+        await Promise.all(projects.map((p) => upsertProject(toCloudProject(p))));
+      } else if (remoteProjects.length > 0) {
+        setProjects(remoteProjects.map(fromCloudProject));
+      }
+      if (remoteContent.length === 0 && content.length > 0) {
+        await Promise.all(content.map((c) => upsertContentItem(toCloudContent(c))));
+      } else if (remoteContent.length > 0) {
+        setContent(remoteContent.map(fromCloudContent));
+      }
+      setCloudStatus('synced');
+    } catch (error) {
+      console.warn('[Hue Stasie] Cloud sync failed:', error);
+      setCloudStatus('error');
+    }
+  }
+
+  async function connectCloud() {
+    if (!isCloudConfigured()) {
+      alert('Cloud sync is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then redeploy.');
+      return;
+    }
+    if (session) { await signOut(); setToast('Signed out of cloud sync'); return; }
+    const email = window.prompt('Enter your Housing Hues email to receive a secure sign-in link:');
+    if (!email) return;
+    try {
+      await signInWithEmail(email);
+      setToast('Check your email for the sign-in link');
+    } catch (error) {
+      alert(`Could not send sign-in link: ${(error as Error).message}`);
+    }
+  }
+
   const scopedProjects = useMemo(() => projects.filter((project) => project.owner === identity || identity === 'Housing Hues'), [projects, identity]);
   const stats = useMemo(() => ({ active: scopedProjects.filter((p) => p.status === 'active').length, blocked: scopedProjects.filter((p) => p.status === 'blocked').length, load: scopedProjects.reduce((sum, p) => sum + p.load, 0) }), [scopedProjects]);
   const currentIdentity = identities.find((item) => item.name === identity) || identities[0];
 
   const addProject = () => {
-    const project: Project = { id: crypto.randomUUID(), name: 'New workspace project', owner: identity, status: 'planned', priority: 'normal', next: 'Define the next action', load: 0 };
+    const project: Project = { id: crypto.randomUUID(), name: 'New workspace project', owner: identity, status: 'planned', priority: 'normal', next: 'Define the next action', notes: '', load: 0 };
     setProjects((items) => [project, ...items]); setModule('projects'); setToast('Project added to the workspace');
+    if (session) upsertProject(toCloudProject(project));
   };
-  const updateProject = (id: string, field: keyof Project, value: string | number) => setProjects((items) => items.map((p) => p.id === id ? { ...p, [field]: value } as Project : p));
-  const approveContent = (id: string) => { setContent((items) => items.map((item) => item.id === id ? { ...item, state: 'Approved' } : item)); setToast('Content approved — publishing is still gated'); };
+  const updateProject = (id: string, field: keyof Project, value: string | number) => {
+    setProjects((items) => {
+      const next = items.map((p) => p.id === id ? { ...p, [field]: value } as Project : p);
+      const updated = next.find((p) => p.id === id);
+      if (session && updated) upsertProject(toCloudProject(updated));
+      return next;
+    });
+  };
+  const approveContent = (id: string) => {
+    setContent((items) => {
+      const next = items.map((item) => item.id === id ? { ...item, state: 'Approved' as const } : item);
+      const updated = next.find((item) => item.id === id);
+      if (session && updated) upsertContentItem(toCloudContent(updated));
+      return next;
+    });
+    setToast('Content approved — publishing is still gated');
+  };
 
   return <div className="app-shell" data-theme={theme} style={{ '--identity': currentIdentity.color } as React.CSSProperties}>
     <aside className="sidebar">
@@ -63,7 +149,7 @@ function App() {
       <div className="sidebar-bottom"><button className="nav-item" onClick={() => setAgentOpen(true)}><i>✦</i>Active agent <span className="live-dot" /></button><button className="nav-item muted" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><i>{theme === 'dark' ? '☼' : '☾'}</i>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</button><div className="profile"><div className="avatar">HM</div><div><strong>Huesir</strong><small>Owner · all access</small></div><span>•••</span></div></div>
     </aside>
     <main className="main-area">
-      <header className="topbar"><div><p className="eyebrow">THURSDAY · 04 SEPTEMBER 2026</p><h1>{module === 'overview' ? 'Good evening, Huesir.' : module === 'content' ? 'Content studio' : module[0].toUpperCase() + module.slice(1)}</h1></div><div className="top-actions"><button className="icon-button" aria-label="Notifications">♧<span /></button><button className="agent-button" onClick={() => setAgentOpen(true)}>✦ <span>Ask the agent</span></button><button className="primary-button" onClick={() => setComposerOpen(true)}>＋ Post now</button></div></header>
+      <header className="topbar"><div><p className="eyebrow">THURSDAY · 04 SEPTEMBER 2026</p><h1>{module === 'overview' ? 'Good evening, Huesir.' : module === 'content' ? 'Content studio' : module[0].toUpperCase() + module.slice(1)}</h1></div><div className="top-actions"><button className="cloud-btn" onClick={connectCloud} title={cloudStatus === 'unavailable' ? 'Cloud sync not configured' : session ? 'Signed in — click to sign out' : 'Click to sign in and sync'}><i>{cloudStatus === 'synced' ? '☁' : cloudStatus === 'syncing' ? '↻' : cloudStatus === 'error' ? '⚠' : '☁'}</i>{cloudStatus === 'unavailable' ? 'LOCAL ONLY' : cloudStatus === 'signed-out' ? 'SIGN IN TO SYNC' : cloudStatus === 'syncing' ? 'SYNCING…' : cloudStatus === 'error' ? 'CLOUD ERROR' : 'CLOUD READY'}</button><button className="icon-button" aria-label="Notifications">♧<span /></button><button className="agent-button" onClick={() => setAgentOpen(true)}>✦ <span>Ask the agent</span></button><button className="primary-button" onClick={() => setComposerOpen(true)}>＋ Post now</button></div></header>
       <div className="identity-strip"><div className="identity-copy"><span className="identity-mark">{currentIdentity.mark}</span><div><small>ACTIVE IDENTITY</small><strong>{identity}</strong></div></div><div className="identity-switcher">{identities.map((item) => <button key={item.name} title={item.name} onClick={() => setIdentity(item.name)} className={item.name === identity ? 'identity-button selected' : 'identity-button'} style={{ '--id-color': item.color } as React.CSSProperties}>{item.mark}</button>)}</div></div>
       {module === 'overview' && <Overview stats={stats} content={content} projects={scopedProjects} onOpenContent={() => setModule('content')} onAgent={() => setAgentOpen(true)} />}
       {module === 'projects' && <Projects projects={scopedProjects} onAdd={addProject} onUpdate={updateProject} />}
@@ -71,7 +157,7 @@ function App() {
       {module === 'content' && <ContentStudio content={content} onApprove={approveContent} onNew={() => setComposerOpen(true)} />}
     </main>
     {agentOpen && <Agent onClose={() => setAgentOpen(false)} onToast={setToast} />}
-    {composerOpen && <Composer identity={identity} onClose={() => setComposerOpen(false)} onSave={(item) => { setContent((items) => [item, ...items]); setComposerOpen(false); setModule('content'); setToast('Draft saved to content studio'); }} />}
+    {composerOpen && <Composer identity={identity} onClose={() => setComposerOpen(false)} onSave={(item) => { setContent((items) => [item, ...items]); setComposerOpen(false); setModule('content'); setToast('Draft saved to content studio'); if (session) upsertContentItem(toCloudContent(item)); }} />}
     {toast && <div className="toast">✓ {toast}</div>}
   </div>;
 }
@@ -89,6 +175,6 @@ function Projects({ projects, onAdd, onUpdate }: { projects: Project[]; onAdd: (
 function Calendar() { return <section className="page-section"><div className="section-heading"><div><p className="eyebrow">OPERATIONS / CALENDAR</p><h2>September 2026</h2></div><button className="primary-button">＋ Add event</button></div><div className="calendar-panel"><div className="calendar-head">Monday <span>Tuesday</span><span>Wednesday</span><span>Thursday</span><span>Friday</span><span>Saturday</span><span>Sunday</span></div><div className="calendar-grid">{Array.from({ length: 30 }, (_, index) => <div className={index === 3 || index === 10 ? 'calendar-day has-event' : 'calendar-day'} key={index}><span>{index + 1}</span>{index === 3 && <small>Roster review</small>}{index === 10 && <small>Studio camp</small>}</div>)}</div></div></section>; }
 function ContentStudio({ content, onApprove, onNew }: { content: ContentItem[]; onApprove: (id: string) => void; onNew: () => void }) { return <section className="page-section"><div className="section-heading"><div><p className="eyebrow">PUBLISHING / PLANNING</p><h2>Content studio</h2></div><button className="primary-button" onClick={onNew}>＋ New draft</button></div><div className="notice"><span>◈</span><div><strong>Publishing is safely gated.</strong><p>Drafts and approvals are live. External publishing will only be enabled after provider permissions and confirmation controls are configured.</p></div></div><div className="content-list">{content.map((item) => <div className="content-card" key={item.id}><div className="content-card-top"><div className="content-thumb large">◎</div><div><p className="eyebrow">{item.channel} · {item.planned}</p><h3>{item.title}</h3></div><span className={`tag ${item.state.toLowerCase().replace(' ', '-')}`}>{item.state}</span></div><p className="caption">{item.caption}</p><div className="card-actions"><button className="quiet-button">Edit draft</button>{item.state === 'In review' && <button className="text-button" onClick={() => onApprove(item.id)}>Approve for handoff ↗</button>}{item.state === 'Approved' && <span className="approval-note">Ready for handoff · no provider connected</span>}</div></div>)}</div></section>; }
 function Agent({ onClose, onToast }: { onClose: () => void; onToast: (message: string) => void }) { return <div className="agent-backdrop" onClick={onClose}><aside className="agent-drawer" onClick={(e) => e.stopPropagation()}><div className="drawer-head"><div><p className="eyebrow">HOUSING HUES AGENT</p><h2>What are we solving?</h2></div><button className="icon-button" onClick={onClose}>×</button></div><div className="agent-status"><span className="live-dot" /> Context loaded · Housing Hues workspace</div><div className="agent-message"><div className="agent-avatar">✦</div><div><p>Good evening. I found <strong>2 blocked threads</strong> and one content review waiting for attention.</p><p>Would you like a concise briefing, a next-action plan, or help preparing a post?</p></div></div><div className="suggestions"><button onClick={() => onToast('Briefing prepared from current workspace records')}>Give me the briefing</button><button onClick={() => onToast('Next actions prepared for review')}>Find next actions</button><button onClick={() => onToast('Post preparation is available in Content studio')}>Prepare a post</button></div><div className="agent-input"><input placeholder="Ask about this workspace…" /><button onClick={() => onToast('Agent input captured — execution remains approval-gated')}>↗</button></div><p className="agent-footnote">Advice and drafting are available. External actions require your confirmation.</p></aside></div>; }
-function Composer({ identity, onClose, onSave }: { identity: string; onClose: () => void; onSave: (item: ContentItem) => void }) { const [caption, setCaption] = useState(''); return <div className="modal-backdrop" onClick={onClose}><div className="composer" onClick={(e) => e.stopPropagation()}><div className="drawer-head"><div><p className="eyebrow">CONTENT STUDIO</p><h2>New social draft</h2></div><button className="icon-button" onClick={onClose}>×</button></div><label>Identity<select defaultValue={identity}><option>{identity}</option></select></label><label>Channel<select><option>Instagram</option><option>Facebook</option><option>TikTok</option></select></label><label>Caption<textarea autoFocus value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Write a caption for review…" /></label><p className="agent-footnote">Saving creates a draft only. It will not publish externally.</p><div className="composer-actions"><button className="quiet-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={!caption.trim()} onClick={() => onSave({ id: crypto.randomUUID(), title: 'Untitled social draft', channel: 'Instagram', state: 'Draft', caption, planned: 'Unscheduled' })}>Save draft</button></div></div></div>; }
+function Composer({ identity, onClose, onSave }: { identity: string; onClose: () => void; onSave: (item: ContentItem) => void }) { const [caption, setCaption] = useState(''); const [selectedIdentity, setSelectedIdentity] = useState(identity); return <div className="modal-backdrop" onClick={onClose}><div className="composer" onClick={(e) => e.stopPropagation()}><div className="drawer-head"><div><p className="eyebrow">CONTENT STUDIO</p><h2>New social draft</h2></div><button className="icon-button" onClick={onClose}>×</button></div><label>Identity<select value={selectedIdentity} onChange={(e) => setSelectedIdentity(e.target.value)}>{identities.map((item) => <option key={item.name}>{item.name}</option>)}</select></label><label>Channel<select><option>Instagram</option><option>Facebook</option><option>TikTok</option></select></label><label>Caption<textarea autoFocus value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Write a caption for review…" /></label><p className="agent-footnote">Saving creates a draft only. It will not publish externally.</p><div className="composer-actions"><button className="quiet-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={!caption.trim()} onClick={() => onSave({ id: crypto.randomUUID(), title: 'Untitled social draft', channel: 'Instagram', state: 'Draft', caption, planned: 'Unscheduled', identity: selectedIdentity })}>Save draft</button></div></div></div>; }
 
 createRoot(document.getElementById('root')!).render(<App />);
