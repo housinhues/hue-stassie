@@ -49,6 +49,7 @@ function App() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [cloudStatus, setCloudStatus] = useState<'unavailable' | 'signed-out' | 'syncing' | 'synced' | 'error'>('unavailable');
 
   useEffect(() => { save('huestasie-projects', projects); }, [projects]);
@@ -60,11 +61,11 @@ function App() {
   // local data up once if the cloud tables are still empty), then treat
   // Supabase as the source of truth for subsequent edits.
   useEffect(() => {
-    if (!isCloudConfigured()) { setCloudStatus('unavailable'); return; }
+    if (!isCloudConfigured()) { setCloudStatus('unavailable'); setAuthReady(true); return; }
     let cancelled = false;
     (async () => {
       const current = await getSession();
-      if (!cancelled) setSession(current);
+      if (!cancelled) { setSession(current); setAuthReady(true); }
       setCloudStatus(current ? 'syncing' : 'signed-out');
       if (current) await syncFromCloud();
     })();
@@ -75,6 +76,10 @@ function App() {
     });
     return () => { cancelled = true; unsubscribe(); };
   }, []);
+
+  if (!authReady) return <AccessScreen title="Checking your secure workspace…" detail="Verifying your Housing Hues session." />;
+  if (!isCloudConfigured()) return <AccessScreen title="Cloud access is not configured" detail="Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel before opening the workstation." />;
+  if (!session) return <LoginScreen />;
 
   async function syncFromCloud() {
     try {
@@ -160,6 +165,33 @@ function App() {
     {composerOpen && <Composer identity={identity} onClose={() => setComposerOpen(false)} onSave={(item) => { setContent((items) => [item, ...items]); setComposerOpen(false); setModule('content'); setToast('Draft saved to content studio'); if (session) upsertContentItem(toCloudContent(item)); }} />}
     {toast && <div className="toast">✓ {toast}</div>}
   </div>;
+}
+
+function AccessScreen({ title, detail }: { title: string; detail: string }) {
+  return <div className="access-screen"><div className="access-card"><div className="brand-symbol">⌬</div><p className="eyebrow">HUESTASIE · PRIVATE OFFICE</p><h1>{title}</h1><p>{detail}</p></div></div>;
+}
+
+function LoginScreen() {
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!email.trim()) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      await signInWithEmail(email);
+      setMessage('Check your email for the secure sign-in link.');
+    } catch (error) {
+      setMessage(`Sign-in failed: ${(error as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="access-screen"><form className="access-card login-card" onSubmit={submit}><div className="brand-symbol">⌬</div><p className="eyebrow">HUESTASIE · PRIVATE OFFICE</p><h1>Sign in to Housing Hues.</h1><p>Your workstation is private. We will email you a secure, one-time sign-in link.</p><label htmlFor="login-email">Housing Hues email</label><input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@housinghues.co.za" autoComplete="email" required /><button className="primary-button" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Send secure link'}</button>{message && <p className="login-message" role="status">{message}</p>}</form></div>;
 }
 
 function Overview({ stats, content, projects, onOpenContent, onAgent }: { stats: { active: number; blocked: number; load: number }; content: ContentItem[]; projects: Project[]; onOpenContent: () => void; onAgent: () => void }) { return <>
