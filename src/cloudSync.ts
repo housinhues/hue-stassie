@@ -63,8 +63,7 @@ export async function fetchProjects(): Promise<CloudProject[]> {
     .select('id, name, identity, status, priority, next_action, notes, workload')
     .order('created_at', { ascending: false });
   if (error) {
-    console.warn('[Hue Stasie] fetchProjects failed:', error.message);
-    return [];
+    throw new Error(`Could not load projects: ${error.message}`);
   }
   return data ?? [];
 }
@@ -82,8 +81,7 @@ export async function fetchContent(): Promise<CloudContentItem[]> {
     .select('id, title, channel, state, caption, planned, identity')
     .order('created_at', { ascending: false });
   if (error) {
-    console.warn('[Hue Stasie] fetchContent failed:', error.message);
-    return [];
+    throw new Error(`Could not load content: ${error.message}`);
   }
   return data ?? [];
 }

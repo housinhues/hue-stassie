@@ -4,7 +4,7 @@ Internal dashboard: project tracker, workload chart, calendar, and social feed l
 
 ## Hosting
 
-This static dashboard is deployed to **GitHub Pages** from the `main` branch. Every push to `main` triggers the workflow in [`.github/workflows/pages.yml`](.github/workflows/pages.yml). The site uses no build step; GitHub Pages serves the repository contents directly.
+This Vite dashboard is deployed to **GitHub Pages** from the `main` branch. Every push to `main` triggers the workflow in [`.github/workflows/pages.yml`](.github/workflows/pages.yml), which installs dependencies, runs the type-check and production build, and publishes `dist/`.
 
 The expected public URL is:
 
@@ -12,7 +12,7 @@ The expected public URL is:
 https://housinhues.github.io/Hue-Stassie/
 ```
 
-The dashboard stores its current workspace in browser `localStorage`, so data is local to each browser until the optional Supabase foundation is configured.
+The dashboard stores its current workspace in browser `localStorage`, so it is usable in local-only mode. When Supabase is configured, the workstation adds magic-link login and cloud persistence.
 
 ## Local preview
 
@@ -22,8 +22,12 @@ python3 -m http.server 4173
 
 Then open <http://127.0.0.1:4173/>.
 
-## Optional cloud persistence
+## Cloud persistence
 
-The `supabase-foundation` branch contains an optional Supabase-backed local-first persistence layer. It should only be enabled after the Supabase project is active, the SQL schema has been applied, and the public URL and anon key have been configured. Never place a Supabase service-role key in frontend code.
+The Supabase-backed local-first persistence layer is enabled automatically when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present at build time. The Supabase project must be active and the SQL schema must be applied before enabling those variables. Never place a Supabase service-role key in frontend code.
 
-The current static experience remains usable without Supabase.
+The app intentionally remains usable without Supabase. In local-only mode, the cloud button reports `LOCAL ONLY` and all edits remain in the current browser.
+
+## Deployment configuration
+
+The GitHub Actions workflow only needs the optional Supabase variables when cloud mode is ready. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as repository Actions secrets, then push to `main`. GitHub Pages must be configured to use **GitHub Actions** as its source.
